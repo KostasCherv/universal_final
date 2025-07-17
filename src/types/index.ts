@@ -35,7 +35,22 @@ export const ProductSchema = z.object({
   description: z.string().optional(),
   stock: z.number().int().min(0)
 });
-;
+
+export const TaskSchema = z.object({
+  id: z.string().min(1),
+  state: z.enum(['pending', 'processing', 'completed', 'failed']),
+  result: z.any().optional().nullable(),
+  error: z.string().optional().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date()
+});
+
+
+export const UpdateTaskSchema = z.object({
+  state: z.enum(['pending', 'processing', 'completed', 'failed']),
+  result: z.any().optional(),
+  error: z.string().optional()
+});
 
 // TypeScript Types (inferred from Zod schemas)
 export type ServerConfig = z.infer<typeof ServerConfigSchema>;
@@ -43,6 +58,8 @@ export type ApiResponse<T = any> = z.infer<ReturnType<typeof ApiResponseSchema<z
 export type InterServerRequest = z.infer<typeof InterServerRequestSchema>;
 export type User = z.infer<typeof UserSchema>;
 export type Product = z.infer<typeof ProductSchema>;
+export type Task = z.infer<typeof TaskSchema>;
+export type UpdateTask = z.infer<typeof UpdateTaskSchema>;
 
 // Specific API Response Types
 export type UserApiResponse = z.infer<ReturnType<typeof ApiResponseSchema<typeof UserSchema>>>;

@@ -10,17 +10,21 @@ import {
   User, 
   InterServerRequestSchema,
   UserSchema,
-  ApiResponseSchema
+  ApiResponseSchema,
+  Task,
+  TaskSchema
 } from './types';
 import { z } from 'zod';
 import { createServer1Tables, seedServer1Data } from './database/schema';
 import { UserRepository } from './database/userRepository';
+import { TaskRepository } from './database/taskRepository';
 import { validateRequest, validateResponse } from './middleware/validation';
 
 const app = express();
 const serverConfig = servers[0]!; // server1
 const auth = new ApiKeyAuth(servers);
 const userRepository = new UserRepository();
+const taskRepository = new TaskRepository();
 
 // Middleware
 app.use(helmet());
@@ -40,6 +44,109 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+
+
+
+// Task management endpoints
+app.post('/tasks', 
+  validateResponse(ApiResponseSchema(TaskSchema)),
+  async (req, res) => {
+    try {
+      // Create task in database
+      const task = await taskRepository.createTask();
+      
+      // Return task ID immediately
+      const response: ApiResponse<Task> = {
+        success: true,
+        data: task,
+        message: 'Task created successfully. Use task ID to check status.',
+        timestamp: new Date().toISOString()
+      };
+      res.status(201).json(response);
+      
+      // Process task in background
+      processTaskInBackground(task.id);
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create task',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }); 
+    }
+  }
+);
+
+// Background task processing function
+async function processTaskInBackground(taskId: string) {
+  try {
+    // Update task state to processing
+    await taskRepository.updateTask(taskId, { state: 'processing' });
+    
+    // Send request to Server 2 for processing
+    const server2 = new HttpClient(servers[1]!.url, servers[1]!.apiKey, servers[1]!.name);
+    const serverResponse = await server2.post('/inter-server', { 
+      from: serverConfig.name,
+      to: 'server2'
+    });
+    
+    // Update task based on Server 2 response
+    if (serverResponse.success) {
+      await taskRepository.updateTask(taskId, { 
+        state: 'completed', 
+        result: serverResponse.data
+      });
+      console.log(`[${serverConfig.name}] Task ${taskId} completed successfully`);
+    } else {
+      await taskRepository.updateTask(taskId, { 
+        state: 'failed', 
+        error: serverResponse.message 
+      });
+      console.log(`[${serverConfig.name}] Task ${taskId} failed: ${serverResponse.message}`);
+    }
+  } catch (error) {
+    // If Server 2 is unavailable, mark task as failed
+    await taskRepository.updateTask(taskId, { 
+      state: 'failed', 
+      error: 'Server 2 unavailable for processing' 
+    });
+    console.error(`[${serverConfig.name}] Task ${taskId} failed due to server error:`, error);
+  }
+}
+
+app.get('/tasks/:id', 
+  validateResponse(ApiResponseSchema(TaskSchema)),
+  async (req, res) => {
+    try {
+      const task = await taskRepository.getTaskById(req.params.id!);
+
+      if (!task) {
+        res.status(404).json({
+          success: false,
+          message: 'Task not found',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+      
+      const response: ApiResponse<Task> = {
+        success: true,
+        data: task,
+        timestamp: new Date().toISOString()
+      };
+      res.json(response);
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Database error',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+);
+
 
 
 
@@ -77,20 +184,8 @@ const initializeServer = async () => {
     app.listen(serverConfig.port, () => {
       console.log(`[${serverConfig.name}] Server running on port ${serverConfig.port}`);
       console.log(`[${serverConfig.name}] Health check: http://localhost:${serverConfig.port}/health`);
-      console.log(`[${serverConfig.name}] Users API: http://localhost:${serverConfig.port}/users`);
-      console.log(`[${serverConfig.name}] Inter-server test: http://localhost:${serverConfig.port}/test-inter-server`);
     });
 
-    // call the server2
-    setInterval(async () => {
-      try {
-        const server2 = new HttpClient(serverConfig.url, serverConfig.apiKey, serverConfig.name);
-        const response = await server2.sendInterServerRequest('server2');
-        console.log(`[${serverConfig.name}] Received response from server2: ${JSON.stringify(response.data)}`);
-      } catch (error) {
-        console.error(`[${serverConfig.name}] Error calling server2:`, error);
-      }
-    }, 10000);
   } catch (error) {
     console.error('Failed to initialize server:', error);
     process.exit(1);

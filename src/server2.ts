@@ -8,14 +8,12 @@ import "./config/index"
 import { 
   ApiResponse, 
   Product, 
-  InterServerRequestSchema,
   ProductSchema,
   ApiResponseSchema
 } from './types';
 import { createServer2Tables, seedServer2Data } from './database/schema';
 import { ProductRepository } from './database/productRepository';
-import { validateRequest, validateResponse } from './middleware/validation';
-import { z } from 'zod';
+import { validateResponse } from './middleware/validation';
 
 const app = express();
 const serverConfig = servers[1]!; // server2
@@ -26,7 +24,6 @@ const productRepository = new ProductRepository();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-
 
 // Routes
 app.get('/health', (req, res) => {
@@ -41,21 +38,51 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Inter-server communication endpoint
+// Products endpoint
+app.get('/products', async (req, res) => {
+  try {
+    const products = await productRepository.getAllProducts();
+    const response: ApiResponse<{ products: Product[] }> = {
+      success: true,
+      data: { products },
+      timestamp: new Date().toISOString()
+    };
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Database error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Inter-server communication endpoint - simplified
 app.post('/inter-server', 
   auth.validateApiKey, 
-  validateRequest(InterServerRequestSchema),
-  validateResponse(ApiResponseSchema(z.object({ products: z.array(ProductSchema) }))),
   async (req, res) => {
     try {
+      console.log(`[${serverConfig.name}] Received inter-server request`);
+      
+      // Simulate processing delay (1-50 seconds)
+      const delay = Math.floor(Math.random() * 50000) + 1000;
+      console.log(`[${serverConfig.name}] Processing request for ${delay}ms delay`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Get products from database
       const products = await productRepository.getAllProducts();
+      
       const response: ApiResponse<{ products: Product[] }> = {
         success: true,
         data: { products },
+        message: 'Products retrieved successfully',
         timestamp: new Date().toISOString()
       };
+      
+      console.log(`[${serverConfig.name}] Returning ${products.length} products after ${delay}ms delay`);
       res.json(response);
     } catch (error) {
+      console.error(`[${serverConfig.name}] Error processing request:`, error);
       res.status(500).json({
         success: false,
         message: 'Database error',
@@ -75,19 +102,7 @@ const initializeServer = async () => {
       console.log(`[${serverConfig.name}] Server running on port ${serverConfig.port}`);
       console.log(`[${serverConfig.name}] Health check: http://localhost:${serverConfig.port}/health`);
       console.log(`[${serverConfig.name}] Products API: http://localhost:${serverConfig.port}/products`);
-      console.log(`[${serverConfig.name}] Inter-server test: http://localhost:${serverConfig.port}/test-inter-server`);
     });
-
-    // call the server1
-    setInterval(async () => {
-      try {
-        const server1 = new HttpClient(serverConfig.url, serverConfig.apiKey, serverConfig.name);
-        const response = await server1.sendInterServerRequest('server1');
-        console.log(`[${serverConfig.name}] Received response from server1: ${JSON.stringify(response.data)}`);
-      } catch (error) {
-        console.error(`[${serverConfig.name}] Error calling server1:`, error);
-      }
-    }, 10000);
   } catch (error) {
     console.error('Failed to initialize server:', error);
     process.exit(1);

@@ -12,6 +12,18 @@ export const createServer1Tables = async () => {
       )
     `);
 
+    // Create tasks table in server1 database
+    await queryServer1(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id VARCHAR(255) PRIMARY KEY,
+        state VARCHAR(50) NOT NULL DEFAULT 'pending',
+        result JSONB,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('Server1 database tables created successfully');
   } catch (error) {
     console.error('Error creating server1 tables:', error);

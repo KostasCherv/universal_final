@@ -9,7 +9,7 @@ export class HttpClient {
   constructor(baseURL: string, apiKey: string, serverName: string) {
     this.client = axios.create({
       baseURL,
-      timeout: 10000,
+      timeout: 60000,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
