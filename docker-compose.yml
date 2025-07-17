@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # PostgreSQL instance for Server 1 (Users)
+  postgres-server1:
+    image: postgres:15-alpine
+    container_name: postgres-server1
+    environment:
+      POSTGRES_DB: server1_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_server1_data:/var/lib/postgresql/data
+    networks:
+      - server-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d server1_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL instance for Server 2 (Products)
+  postgres-server2:
+    image: postgres:15-alpine
+    container_name: postgres-server2
+    environment:
+      POSTGRES_DB: server2_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_server2_data:/var/lib/postgresql/data
+    networks:
+      - server-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d server2_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_server1_data:
+    driver: local
+  postgres_server2_data:
+    driver: local
+
+networks:
+  server-network:
+    driver: bridge 
