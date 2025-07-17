@@ -1,6 +1,6 @@
-# TypeScript Express Servers
+# TypeScript Express Microservices
 
-Two Express servers with PostgreSQL databases and API key authentication.
+Two Express servers with PostgreSQL databases and task-based processing.
 
 ## Quick Start
 
@@ -12,7 +12,6 @@ Two Express servers with PostgreSQL databases and API key authentication.
 2. **Set up environment:**
    ```bash
    cp env.example .env
-   # Edit .env with your values
    ```
 
 3. **Start databases:**
@@ -29,18 +28,22 @@ Two Express servers with PostgreSQL databases and API key authentication.
    npm run server2
    ```
 
-## API Endpoints
+## Test the System
 
-- **Server 1** (Port 3001): `http://localhost:3001/health`
-- **Server 2** (Port 3002): `http://localhost:3002/health`
+```bash
+# Create a task
+curl -X POST http://localhost:3001/tasks
 
-## Features
+# Check task status (replace task-id with actual ID)
+curl http://localhost:3001/tasks/task-id
 
-- ✅ Separate PostgreSQL databases
-- ✅ API key authentication
-- ✅ Zod validation
-- ✅ TypeScript
-- ✅ Docker support
+# Get products
+curl http://localhost:3002/products
+
+# Health checks
+curl http://localhost:3001/health
+curl http://localhost:3002/health
+```
 
 ## Commands
 
@@ -50,8 +53,4 @@ npm run server2          # Start server 2
 npm run docker:up        # Start databases
 npm run docker:down      # Stop databases
 npm run build           # Build TypeScript
-npm test               # Run tests
 ```
-```
-
-This README is minimal but covers all the essential information needed to get started with your project.
